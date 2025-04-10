@@ -1,12 +1,12 @@
 # Package
 
-version       = "1.0.2"
+version       = "1.0.3"
 author        = "Constantine Molchanov"
 description   = "App to build Nim Docker images and push them to Docker Hub."
 license       = "MIT"
 srcDir        = "src"
 binDir        = "bin"
-bin           = @["nimage"]
+bin           = @["dhbp"]
 
 
 # Dependencies

@@ -3,4 +3,5 @@ build
 nimcache
 *.sublime-*
 ./Dockerfile
+Dockerfiles
 bin/
