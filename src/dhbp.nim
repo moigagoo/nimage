@@ -4,7 +4,6 @@ import climate
 
 import dhbp/flavors/[slim, regular]
 
-
 proc isDefault(props: JsonNode): bool =
   props.getOrDefault("default").getBool
 
@@ -16,32 +15,32 @@ proc getTags(
 ): seq[string] =
   result = @[]
 
-  result.add([version.key, base.key, flavor].join("-"))
-
-  if flavor == "regular":
-    result.add([version.key, base.key].join("-"))
-
-    if version.val.isLatest:
-      result.add(["latest", base.key].join("-"))
-
-    if base.val.isDefault:
-      result.add version.key
-
-  if version.val.isLatest:
-    result.add(["latest", base.key, flavor].join("-"))
-
-    if flavor == "regular":
-      result.add base.key
-
-  if base.val.isDefault:
-    result.add([version.key, flavor].join("-"))
-
   if version.val.isLatest and base.val.isDefault:
     if flavor == "regular":
       result.add "latest"
 
-    result.add(["latest", flavor].join("-"))
     result.add flavor
+    result.add(["latest", flavor].join("-"))
+
+  if flavor == "regular":
+    if base.val.isDefault:
+      result.add version.key
+
+    if version.val.isLatest:
+      result.add(["latest", base.key].join("-"))
+
+    result.add([version.key, base.key].join("-"))
+
+  if version.val.isLatest:
+    if flavor == "regular":
+      result.add base.key
+
+    result.add(["latest", base.key, flavor].join("-"))
+
+  if base.val.isDefault:
+    result.add([version.key, flavor].join("-"))
+
+  result.add([version.key, base.key, flavor].join("-"))
 
 proc generateDockerfile(
     version, base, flavor: string,
@@ -143,7 +142,8 @@ proc createBuilder(context: Context): int =
 
 proc buildAndPushImages(context: Context): int =
   const
-    labels = {"authors": "https://github.com/nim-lang/docker-images/graphs/contributors"}
+    labels =
+      {"authors": "https://github.com/nim-lang/docker-images/graphs/contributors"}
     tagPrefix = "nimlang/nim"
     flavors = ["slim", "regular"]
     dockerfilesDir = "Dockerfiles"
@@ -210,9 +210,36 @@ proc buildAndPushImages(context: Context): int =
 
             echo "Done!"
 
+proc generateTagListMd(context: Context): int =
+  const
+    repoLocation = "https://github.com/nim-lang/docker-images/blob/develop"
+    flavors = ["regular", "slim"]
+    dockerfilesDir = "Dockerfiles"
 
-const commands = {"build-and-push": buildAndPushImages, "setup": createBuilder}
+  var configFile = "config.json"
 
+  let
+    config = parseFile(configFile)
+    bases = config["bases"]
+    versions = config["versions"]
+
+  for version in versions.pairs:
+    for base in bases.pairs:
+      for flavor in flavors:
+        let
+          dockerfileDir = dockerfilesDir / version.key / flavor
+          tags = getTags(version, base, flavor)
+
+        echo(
+          "- [$#]($#)" %
+            [tags.join(", "), [repoLocation, dockerfileDir, "Dockerfile"].join("/")]
+        )
+
+const commands = {
+  "build-and-push": buildAndPushImages,
+  "setup": createBuilder,
+  "generate-tag-list-md": generateTagListMd,
+}
 
 when isMainModule:
   quit parseCommands(commands, defaultHandler = showHelp)
