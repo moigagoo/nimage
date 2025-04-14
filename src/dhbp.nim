@@ -1,4 +1,4 @@
-import std/[os, strutils, json]
+import std/[os, sequtils, strutils, json]
 
 import climate
 
@@ -232,7 +232,7 @@ proc generateTagListMd(context: Context): int =
 
         echo(
           "- [$#]($#)" %
-            [tags.join(", "), [repoLocation, dockerfileDir, "Dockerfile"].join("/")]
+            [tags.mapIt("`" & it & "`").join(", "), [repoLocation, dockerfileDir, "Dockerfile"].join("/")]
         )
 
 const commands = {
