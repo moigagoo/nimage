@@ -5,3 +5,4 @@ nimcache
 ./Dockerfile
 Dockerfiles
 bin/
+nim

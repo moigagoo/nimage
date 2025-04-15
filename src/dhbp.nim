@@ -13,8 +13,11 @@ proc isLatest(props: JsonNode): bool =
 proc getTags(
     version, base: tuple[key: string, val: JsonNode], flavor: string
 ): seq[string] =
-  result = @[]
+  result.add([version.key, base.key, flavor].join("-"))
 
+proc getSharedTags(
+    version, base: tuple[key: string, val: JsonNode], flavor: string
+): seq[string] =
   if version.val.isLatest and base.val.isDefault:
     if flavor == "regular":
       result.add "latest"
@@ -39,8 +42,6 @@ proc getTags(
 
   if base.val.isDefault:
     result.add([version.key, flavor].join("-"))
-
-  result.add([version.key, base.key, flavor].join("-"))
 
 proc generateDockerfile(
     version, base, flavor: string,
@@ -229,16 +230,68 @@ proc generateTagListMd(context: Context): int =
         let
           dockerfileDir = dockerfilesDir / version.key / flavor
           tags = getTags(version, base, flavor)
+          sharedTags = getSharedTags(version, base, flavor)
 
         echo(
           "- [$#]($#)" %
             [tags.mapIt("`" & it & "`").join(", "), [repoLocation, dockerfileDir, "Dockerfile"].join("/")]
         )
 
+        if len(sharedTags) > 0:
+          echo(
+            "    - [$#]($#)" %
+              [sharedTags.mapIt("`" & it & "`").join(", "), [repoLocation, dockerfileDir, "Dockerfile"].join("/")]
+          )
+
+proc generateDockerhubLibraryFile(context: Context): int =
+  var
+    configFile = "config.json"
+    gitCommit = ""
+    
+  context.arg:
+    gitCommit = arg
+  do:
+    quit "`commit` argument is mandatory"
+  
+  const
+    flavors = ["regular", "slim"]
+    dockerfilesDir = "Dockerfiles"
+
+  let
+    config = parseFile(configFile)
+    bases = config["bases"]
+    versions = config["versions"]
+
+  echo """# this file is generated via https://github.com/moigagoo/dhbp.git
+
+Maintainers: Constantine Molchanov <moigagoo@duck.com> (@moigagoo),
+             Akito Kitsune <akito.kitsune@protonmail.com> (@theAkito)
+
+GitRepo: https://github.com/nim-lang/docker-images.git
+GitCommit: $#""" % gitCommit
+    
+  for version in versions.pairs:
+    for base in bases.pairs:
+      for flavor in flavors:
+        let
+          dockerfileDir = dockerfilesDir / version.key / flavor
+          tags = getTags(version, base, flavor)
+          sharedTags = getSharedTags(version, base, flavor)
+
+        echo ""
+        echo "Tags: $#" % tags.join(", ")
+
+        if len(sharedTags) > 0:
+          echo "SharedTags: $#" % sharedTags.join(", ")
+
+        echo "Architectures: amd64, arm32v7, arm64v8"
+        echo "Directory: $#" % dockerfileDir
+  
 const commands = {
   "build-and-push": buildAndPushImages,
   "setup": createBuilder,
   "generate-tag-list-md": generateTagListMd,
+  "generate-dockerhub-library-file": generateDockerhubLibraryFile,
 }
 
 when isMainModule:
